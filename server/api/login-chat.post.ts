@@ -31,6 +31,16 @@ function getRandomNick(): string {
     'Jean-Jacques Rousseau', // Oświecenie
     'Ludwig Wittgenstein', // XX wiek
     'Bertrand Russell', // XX wiek
+    'Roman Ingarden',
+    'Kazimierz Twardowski',
+    'Tadeusz Kotarbiński',
+    'Leszek Kołakowski',
+    'Władysław Tatarkiewicz',
+    'Jan Łukasiewicz',
+    'Alfred Tarski',
+    'Stanisław Lem',
+    'Czesław Miłosz',
+    'Henryk Skolimowski',
   ];
 
   return nicknames[~~(Math.random() * nicknames.length)];

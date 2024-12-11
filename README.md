@@ -8,6 +8,8 @@ Pozwala przesyłać proste teksty i małe pliki.
 
 Nie ma wsparcia dla bazy danych ze wszystkimi tego konsekwencjami.
 
+**DockerHub**: https://hub.docker.com/repository/docker/doleczekj/wormhole-chat/general
+
 ![lista pokoi](docs/wormhole-chat-1.png)
 ![tworzenie pokoju](docs/wormhole-chat-2.png)
 ![wejście do pokoju](docs/wormhole-chat-3.png)

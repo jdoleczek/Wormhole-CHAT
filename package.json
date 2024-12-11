@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@pinia/nuxt": "^0.5.5",
+    "@vite-pwa/nuxt": "^0.10.6",
     "markdown-it": "^14.1.0",
     "nuxt": "^3.14.159",
     "qrcode": "^1.5.4",
@@ -20,5 +21,6 @@
   },
   "devDependencies": {
     "vuetify-nuxt-module": "^0.18.3"
-  }
+  },
+  "version": "1.0.0"
 }
