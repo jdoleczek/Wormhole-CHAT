@@ -8,6 +8,8 @@
 </template>
 
 <script setup>
+import { onMounted } from "vue";
+
 useHead({
   meta: [
     // Windows icons
@@ -43,5 +45,17 @@ useHead({
     // Other icons
     { rel: 'icon', type: 'image/png', href: '/favicon-228x228.png', size: '228x228' },
   ],
+});
+
+onMounted(() => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(() => {
+        console.log('Service Worker zarejestrowany');
+      })
+      .catch((error) => {
+        console.error('Błąd podczas rejestracji Service Workera:', error);
+      });
+  }
 });
 </script>
