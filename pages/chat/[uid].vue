@@ -160,7 +160,10 @@ const showCliModal = ref(false);
 const showQrModal = ref(false);
 const snackbar = ref(false);
 
-let evSrc = null;
+let ws = null;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let allowReconnect = true;
 let chat = ref({});
 let connection = ref({});
 let participants = ref([]);
@@ -183,6 +186,109 @@ const form = ref({
 const cancel = () => {
   showModal.value = false;
   router.push('/');
+};
+
+const handleIncomingEvent = (payload) => {
+  let data = null;
+
+  try {
+    data = JSON.parse(payload);
+  } catch (error) {
+    console.error('Nie udało się sparsować wiadomości WebSocket', error);
+    return;
+  }
+
+  const lastMsg = msgs.value.slice(-1)[0];
+
+  try {
+    if (data.kind == 'message') {
+      data.md = md.render(data.content).trim();
+      data.isSame = data.fromUid == lastMsg?.fromUid && lastMsg?.kind === 'message';
+    }
+
+    if (data.kind == 'file') {
+      const file = JSON.parse(data.content);
+      data.fileName = file.name;
+      data.fileData = file.data;
+    }
+
+    if (data.kind == 'participants') {
+      participants.value = JSON.parse(data.content);
+    }
+
+    msgs.value.push(data);
+  } catch (error) {
+    console.error(error);
+  }
+
+  setTimeout(() => {
+    if (content.value) {
+      content.value.scrollTop = content.value.scrollHeight;
+    }
+  }, 50);
+};
+
+const cleanupSocket = () => {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  if (ws) {
+    ws.onclose = null;
+    ws.onerror = null;
+    ws.onmessage = null;
+    ws.close();
+    ws = null;
+  }
+};
+
+const scheduleReconnect = () => {
+  if (!allowReconnect || !connection.value.secret) {
+    return;
+  }
+
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+  reconnectAttempts += 1;
+
+  reconnectTimer = setTimeout(() => {
+    connectWebSocket();
+  }, delay);
+};
+
+const connectWebSocket = () => {
+  cleanupSocket();
+
+  if (!connection.value.secret) {
+    return;
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const wsUrl = `${protocol}://${window.location.host}/api/events?secret=${connection.value.secret}`;
+
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    reconnectAttempts = 0;
+  };
+
+  ws.onmessage = (event) => {
+    handleIncomingEvent(event.data);
+  };
+
+  ws.onerror = () => {
+    console.error('Błąd w WebSocket');
+    ws?.close();
+  };
+
+  ws.onclose = (event) => {
+    if (event?.code === 4401) {
+      allowReconnect = false;
+      return;
+    }
+
+    scheduleReconnect();
+  };
 };
 
 const login = async () => {
@@ -218,44 +324,7 @@ const login = async () => {
   connection.value = await response.json();
   showModal.value = false;
 
-  evSrc = new EventSource(`/api/events?secret=${connection.value.secret}`);
-
-  evSrc.onmessage = (event) => {
-    let data = JSON.parse(event.data);
-    const lastMsg = msgs.value.slice(-1)[0];
-
-    try {
-      if (data.kind == 'message') {
-        data.md = md.render(data.content).trim();
-        data.isSame = data.fromUid == lastMsg?.fromUid && lastMsg?.kind === 'message';
-      }
-
-      if (data.kind == 'file') {
-        const file = JSON.parse(data.content);
-        data.fileName = file.name;
-        data.fileData = file.data;
-      }
-
-      if (data.kind == 'participants') {
-        participants.value = JSON.parse(data.content);
-      }
-
-      msgs.value.push(data);
-    } catch (error) {
-      console.error(error);
-    }
-
-    setTimeout(() => {
-      if (content.value) {
-        content.value.scrollTop = content.value.scrollHeight;
-      }
-    }, 50);
-  };
-
-  evSrc.onerror = () => {
-    console.error('Błąd w SSE');
-    evSrc?.close();
-  };
+  connectWebSocket();
 
   if (msgtextarea.value) {
     setTimeout(() => {
@@ -388,7 +457,10 @@ try {
   console.error(error);
 }
 
-onUnmounted(() => evSrc?.close());
+onUnmounted(() => {
+  allowReconnect = false;
+  cleanupSocket();
+});
 </script>
 
 <style>

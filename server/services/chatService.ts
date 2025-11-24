@@ -1,4 +1,3 @@
-import { H3Event } from 'h3';
 import { v4 as uuidv4 } from 'uuid';
 
 import { chatRooms, connections, ChatMessage, ChatMessageKind, ChatConnection } from '../data/chatRooms';
@@ -7,9 +6,15 @@ export function getConnection(secret: string) : ChatConnection | null {
   return connections[secret] || null;
 }
 
-export function registerBySecet(secret: string, event: H3Event) : ChatConnection | null {
-  if (!!getConnection(secret)) {
-    return null;
+export function registerBySecret(secret: string, socket: any) : ChatConnection | null {
+  if (connections[secret]?.socket) {
+    try {
+      connections[secret].socket?.close?.();
+    } catch (e) {
+      console.error('problem closing stale socket', e);
+    }
+
+    delete connections[secret];
   }
 
   for (let i = 0; i < chatRooms.length; i++) {
@@ -19,26 +24,14 @@ export function registerBySecet(secret: string, event: H3Event) : ChatConnection
       let participant = chat.participants[j];
 
       if (participant.secret === secret) {
-        setHeaders(event, {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        });
-
         let connection: ChatConnection = {
           chat,
           participant,
           created: new Date(),
-          stream: event.node.res
+          socket,
         };
 
         connections[secret] = connection;
-
-        connection.stream?.on('close', () => {
-          connection.stream?.end();
-          connection.stream = null;
-          updateParticipantsMsg(connection);
-        });
 
         updateParticipantsMsg(connection);
         return connection;
@@ -61,8 +54,12 @@ export function msg(connection: ChatConnection, message: string, kind: ChatMessa
   for (let i = 0; i < connection.chat.participants.length; i++) {
     let participant = connection.chat.participants[i];
 
-    if (connections[participant.secret] && connections[participant.secret].stream) {
-      connections[participant.secret].stream?.write(`data: ${JSON.stringify(messagePack)}\n\n`);
+    if (connections[participant.secret] && connections[participant.secret].socket) {
+      try {
+        connections[participant.secret].socket?.send(JSON.stringify(messagePack));
+      } catch (error) {
+        console.error('Failed to push message via websocket', error);
+      }
     }
   }
 
@@ -78,8 +75,25 @@ export function updateParticipantsMsg(connection: ChatConnection) : ChatMessage 
     nick: participant.nick,
     uid: participant.uid,
     isAdmin: participant.role === 'admin',
-    isActive: !!connections[participant.secret]?.stream || false,
+    isActive: !!connections[participant.secret]?.socket || false,
   })));
 
   return msg(connection, message, 'participants');
+}
+
+export function removeConnection(secret: string) : ChatConnection | null {
+  const connection = connections[secret] || null;
+
+  if (connection) {
+    try {
+      connection.socket?.close?.();
+    } catch (error) {
+      console.error('Failed to close websocket cleanly', error);
+    }
+
+    connection.socket = null;
+    delete connections[secret];
+  }
+
+  return connection;
 }
