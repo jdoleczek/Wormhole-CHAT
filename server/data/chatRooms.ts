@@ -1,4 +1,3 @@
-import { ServerResponse } from 'http';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ChatParticipant {
@@ -32,7 +31,7 @@ export interface ChatConnection {
   chat: ChatRoom,
   participant: ChatParticipant,
   created: Date,
-  stream: ServerResponse | null,
+  socket: any,
 }
 
 export const chatRooms: ChatRoom[] = [
